@@ -1,0 +1,52 @@
+version: 0.1
+
+env:
+  variables:
+    GIT_TAG: 0.0.1 # will use it to tag the docker image
+    GIT_URL: ccs-fundamentals/FlaskAwsBoilerPlate
+  parameter-store:
+    REPOSITORY_URI: /ecr/test # ECR URI
+    PYTHON_URI: /ecr/python36-image
+    POST_REQUEST_URL: /deployment/test_url
+phases:
+  install:
+    commands:
+      - wget https://releases.hashicorp.com/terraform/0.12.24/terraform_0.12.24_linux_amd64.zip
+      - unzip terraform_0.12.24_linux_amd64.zip
+      - ls
+      - mv terraform /usr/bin
+      - rm terraform_0.12.24_linux_amd64.zip
+      - apt-get update
+      - terraform version
+      - export python=python3.6
+      - wget https://bootstrap.pypa.io/pip/3.5/get-pip.py
+      - python3.6 get-pip.py
+      - python3.6 -m pip install -r requirements.txt --default-timeout=2000 --extra-index-url http://artifactory.factset.com/artifactory/api/pypi/python/simple --trusted-host artifactory.factset.com
+  pre_build:
+    commands:
+      - echo Logging in to Amazon ECR...
+      - aws --version
+      - $(aws ecr get-login --region $AWS_DEFAULT_REGION --no-include-email)
+      - echo $REPOSITORY_URI
+      - echo $GIT_TAG
+  build:
+    commands:
+      - echo Build started on `date`
+      - echo Building the Docker image....
+      - docker build -t $REPOSITORY_URI:latest -f FlaskAwsBoilerPlate/build/Dockerfile --build-arg IMAGE=$PYTHON_URI . #added file path in docker run
+      - echo docker tag $REPOSITORY_URI:$GIT_TAG
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$GIT_TAG
+  post_build:
+    commands:
+      - echo Build completed on `date`
+      - echo Pushing the Docker images...
+      - docker push $REPOSITORY_URI:$GIT_TAG
+      - echo Running Terraform...
+      - cd MetaEndpoint/dev/terraform
+      - terraform init
+      - terraform plan
+      - terraform apply -auto-approve
+      - echo "deployment notification"
+      - curl -X POST $POST_REQUEST_URL -H 'Content-Type:application/json' -d '{"commit_id":$CODEBUILD_RESOLVED_SOURCE_VERSION, "deployment_url":$CODEBUILD_SOURCE_REPO_URL, "relative_buildspec_path":"FlaskAwsBoilerPlate/build/buildspec.yml", "product_url":$GIT_URL}'
+      - cd ../
+      - python3.6 app.py

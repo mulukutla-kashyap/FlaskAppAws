@@ -5,8 +5,7 @@ env:
     GIT_TAG: 0.0.1 # will use it to tag the docker image
     GIT_URL: mulukutla-kashyap/FlaskAppAws
   parameter-store:
-    REPOSITORY_URI: /ecr/test # ECR URI
-    PYTHON_URI: /ecr/python36-image
+    REPOSITORY_URI: https://github.com/mulukutla-kashyap/FlaskAppAws.git#main # ECR URI
     POST_REQUEST_URL: /deployment/test_url
 phases:
   install:
@@ -33,7 +32,7 @@ phases:
     commands:
       - echo Build started on `date`
       - echo Building the Docker image....
-      - docker build -t $REPOSITORY_URI:latest -f FlaskAppAws/build/Dockerfile --build-arg IMAGE=$PYTHON_URI . #added file path in docker run
+      - docker build -t $REPOSITORY_URI:latest -f FlaskAppAws/build/Dockerfile . #added file path in docker run
       - echo docker tag $REPOSITORY_URI:$GIT_TAG
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$GIT_TAG
   post_build:
